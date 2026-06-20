@@ -21,13 +21,14 @@ def solve_problem(data: pd.DataFrame, thresh: dict):
     if umax > len(data.index):
         raise ValueError("umax cannot exceed the number of rows in data.")
 
-    solver = pywraplp.Solver.CreateSolver("CBC_MIXED_INTEGER_PROGRAMMING")
+    solver = pywraplp.Solver.CreateSolver("SAT") #"CBC_MIXED_INTEGER_PROGRAMMING"
 
     if solver is None:
         raise RuntimeError("OR-Tools CBC solver is unavailable in this environment.")
 
-    x = {i: solver.IntVar(0, 1, f"x_{k}") for k, i in enumerate(data.index)}
-
+    x = {i: solver.BoolVar(f"x_{k}") for k, i in enumerate(data.index)}
+    # Relaxed version (for testing):
+    #x = {i: solver.NumVar(0, 1, f"x_{k}") for k, i in enumerate(data.index)}
     objective_terms = [data.at[i, "value"] * x[i] for i in data.index]
     objective_expression = " + ".join(
         f"{data.at[i, 'value']}*x_{k}" for k, i in enumerate(data.index)
@@ -42,16 +43,20 @@ def solve_problem(data: pd.DataFrame, thresh: dict):
         print("No feasible solution found.")
         return None
 
-    print(f"Objective function: max {objective_expression}")
-    print(f"Objective value: {solver.Objective().Value()}")
     print("Solution:")
     sum_x = 0
+    count_non_integer = 0
     for i in data.index:
-        x_current = int(round(x[i].solution_value()))
-        print(f"  x[{i}] = {x_current}")
+        x_current = x[i].solution_value()
+        if x_current not in (0, 1):
+            count_non_integer += 1
+            print(f"  x[{i}] = {x_current} (non-integer)")
+        #print(f"  x[{i}] = {x_current}")
         sum_x += x_current
     print(f"Sum of x: {sum_x}")
-
+    print(f"Expected range for sum of x: [{umin}, {umax}]")
+    print(f"Objective value: {solver.Objective().Value()}")
+    print(f"Number of non-integer x values: {count_non_integer}")
     return solver
 
 
@@ -78,11 +83,11 @@ def main(n: int = 10):
     df = create_synthetic_table(
         n=n,
         columns={
-            "value": list(range(1, n)),
-            "city": ["New York", "Los Angeles", "Chicago", "Houston"],
+            "value": [ i for i in range(1, n)],
+            "attrib_1": ["A", "B", "C", "D"],
         }
     )
-    model = solve_problem(df, thresh={"umin": int(0.02 * n), "umax": int(0.5 * n)})
+    model = solve_problem(df, thresh={"umin": int(0.02 * n), "umax": int(0.03 * n)})
     end_time = time.time()
     print(f"Execution time: {create_seconds_to_hms(int(end_time - start_time))}")
     return None
