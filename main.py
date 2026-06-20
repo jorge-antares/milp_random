@@ -21,10 +21,11 @@ def solve_problem(data: pd.DataFrame, thresh: dict):
     if umax > len(data.index):
         raise ValueError("umax cannot exceed the number of rows in data.")
 
-    solver = pywraplp.Solver.CreateSolver("SAT") #"CBC_MIXED_INTEGER_PROGRAMMING"
+    # Algorithms: CBC_MIXED_INTEGER_PROGRAMMING, SAT, BOP, SCIP
+    solver = pywraplp.Solver.CreateSolver("BOP") 
 
     if solver is None:
-        raise RuntimeError("OR-Tools CBC solver is unavailable in this environment.")
+        raise RuntimeError("Solver is unavailable.")
 
     x = {i: solver.BoolVar(f"x_{k}") for k, i in enumerate(data.index)}
     # Relaxed version (for testing):
@@ -81,9 +82,9 @@ def create_seconds_to_hms(seconds: int) -> str:
 def main(n: int = 10):
     start_time = time.time()
     df = create_synthetic_table(
-        n=n,
-        columns={
-            "value": [ i for i in range(1, n)],
+        n       = n,
+        columns = {
+            "value":    [ i for i in range(1, n)],
             "attrib_1": ["A", "B", "C", "D"],
         }
     )
